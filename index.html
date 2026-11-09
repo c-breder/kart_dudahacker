@@ -40,7 +40,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8fd3ff;font-family:'B
 body.touch #mute{bottom:auto;top:88px;left:12px;transform:none}
 #bChant{position:fixed;top:72px;left:12px;pointer-events:auto;font-family:inherit;font-weight:800;font-size:17px;color:#fff;background:#d6247a;border:3px solid #fff;border-radius:14px;padding:4px 14px;box-shadow:0 4px 0 #8c1350;touch-action:none}
 #bChant:disabled{background:#8a7a85;box-shadow:0 4px 0 #555}
-body.touch #bChant{top:132px}
+#bKiss{position:fixed;top:118px;left:12px;pointer-events:auto;font-family:inherit;font-weight:800;font-size:17px;color:#fff;background:#ff4f9a;border:3px solid #fff;border-radius:14px;padding:4px 14px;box-shadow:0 4px 0 #a3245c;touch-action:none}
+#bKiss:disabled{background:#8a7a85;box-shadow:0 4px 0 #555}
+body.touch #bChant,body.touch #bKiss{top:auto;left:auto;right:20px;bottom:196px;width:66px;height:66px;border-radius:50%;padding:0;font-size:30px;line-height:1}
 #coins{position:absolute;top:62px;left:12px;font-size:20px;font-weight:800}
 body:not(.touch) #coins{top:118px}
 .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;background:linear-gradient(180deg,rgba(255,120,170,.55),rgba(90,80,220,.55));overflow:auto}
@@ -85,7 +87,7 @@ select{font-family:inherit;font-size:17px;font-weight:800;border-radius:10px;bor
     <div class="right"><button id="bHonk">📯</button><button id="bItem">🎁</button><button id="bDown">▼</button><button id="bUp">▲</button></div>
   </div>
   <button id="mute">🔊</button>
-  <button id="bChant" class="hidden">💰 CHANTAGEM</button>
+  <button id="bChant" class="hidden">💰 CHANTAGEM</button><button id="bKiss" class="hidden">📖 BEIJO</button>
   <div id="coins" class="out hidden">🪙 x 0</div>
 </div>
 
@@ -203,7 +205,7 @@ function saveNames(){try{localStorage.setItem('gp-amigas-modo',$('#diff').value)
 buildCards();
 $('#hint').textContent=isTouch
   ? '▲ acelera · ▼ freia/ré · ◀ ▶ vira · 🎁 lança o item pra frente · 📯 buzina'
-  : 'Setas ou WASD pra dirigir · ESPAÇO lança o item pra frente (segurando ↓ a banana vai pra trás) · H buzina · M chantagem';
+  : 'Setas ou WASD pra dirigir · ESPAÇO lança o item pra frente (segurando ↓ a banana vai pra trás) · H buzina · M poder especial (Joelly e Lorera)';
 
 /* ---------- Áudio ---------- */
 let AC=null, engOsc=null, engGain=null, muted=false;
@@ -404,7 +406,19 @@ function buildKart(ch){
 
 /* ---------- Estado da corrida ---------- */
 const MAXS=34, ACC=21, SPIN=1.1;
-let chantVictim=null, chantAI=null, chantCD=0, coins=0, aiChantT=20;
+let chantVictim=null, chantAI=null, chantCD=0, coins=0, aiChantT=20, kissCD=0, kissOK=false;
+const floaters=[];
+const heartT=canvasTex(64,64,(g)=>{g.font='48px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('💖',32,36);});
+function statusSprite(r,key,text){r.st=r.st||{};if(!r.st[key]){const sp=nameSprite(text,'#111');sp.position.y=4.6;r.m.g.add(sp);r.st[key]=sp;}return r.st[key];}
+function beijo(){
+  if(!kissOK||kissCD>0||state!=='race') return;
+  kissCD=12; const L=player.ch.name, msgs=[];
+  racers.forEach(r=>{if(r.isP||r.finished)return;
+    if(r.ch===CHARS[1]){r.dizzy=3.2;statusSprite(r,'dizzy','💫 TONTA').visible=true;msgs.push(`${r.ch.name}: "${L}, assim não vale!" 😵‍💫`);}
+    if(r.ch===CHARS[0]){r.love=3.5;r.heartT=0;statusSprite(r,'love','📴 OFFLINE').visible=true;msgs.push(`${r.ch.name} ficou offline 💕`);}});
+  if(msgs.length) toast('💋 '+msgs.join(' · '));
+  [1046,1318,1568].forEach((f,i)=>tone(f,0.18,'sine',0.07,null,i*0.08));
+}
 const DUDA_LINES=['"NÃO CONTA NADA PRA SUA MÃE E PRO PAULINHO" 😱💸'];
 function chantagem(by){
   const v=chantVictim; if(!v||chantCD>0||state!=='race'||v.finished) return;
@@ -429,7 +443,7 @@ const ICON={banana:'🍌',tubarao:'🦈',turbo:'🌶️'};
 
 function clearRace(){
   racers.forEach(r=>scene.remove(r.m.g)); items.forEach(it=>scene.remove(it.mesh));
-  racers=[]; items=[]; boxes.forEach(b=>{b.active=true;b.mesh.visible=true;});
+  racers=[]; items=[]; floaters.forEach(f=>scene.remove(f.sp)); floaters.length=0; boxes.forEach(b=>{b.active=true;b.mesh.visible=true;});
 }
 function startRace(){
   if($('#diff').value!=='psicose'&&!CHARS.some((_,i)=>i!==chosen&&rivals[i])){$('#menu').classList.remove('hidden');$('#rivCount').animate([{transform:'scale(1)'},{transform:'scale(1.25)'},{transform:'scale(1)'}],{duration:400});return;}
@@ -450,7 +464,8 @@ function startRace(){
   });
   {const du=racers.find(r=>r.ch===CHARS[1]), jo=racers.find(r=>r.ch===CHARS[3]);
    chantVictim=(du&&jo)?du:null; chantAI=(du&&jo&&du.isP)?jo:null; chantCD=0; coins=0; aiChantT=12+Math.random()*10;
-   $('#bChant').classList.toggle('hidden',!(chantVictim&&!chantVictim.isP)); $('#coins').classList.add('hidden');}
+   $('#bChant').classList.toggle('hidden',!(chantVictim&&player.ch===CHARS[3])); $('#coins').classList.add('hidden');
+   kissCD=0; kissOK=!!(player&&player.ch===CHARS[2]&&racers.some(r=>r.ch===CHARS[0]||r.ch===CHARS[1])); $('#bKiss').classList.toggle('hidden',!kissOK);}
   raceTime=0; countT=3.999; lastCount=4; state='count';
   $('#menu').classList.add('hidden'); $('#results').classList.add('hidden'); $('#hud').classList.remove('hidden');
   $('#touch').classList.toggle('hidden',!isTouch);
@@ -471,7 +486,7 @@ addEventListener('keydown',e=>{
   if(!e.repeat){
     if(e.code==='Space'||e.code==='ShiftLeft'||e.code==='KeyX') useItem(player);
     if(e.code==='KeyH') honk();
-    if(e.code==='KeyM'&&chantVictim&&!chantVictim.isP) chantagem(player);
+    if(e.code==='KeyM'){ if(kissOK) beijo(); else if(chantVictim&&player&&player.ch===CHARS[3]) chantagem(player); }
     if(e.code==='Enter'&&state==='menu') startRace();
   }
   keys[e.code]=true;
@@ -483,7 +498,8 @@ function hold(id,k){const el=$(id);
   el.addEventListener('pointerdown',on);['pointerup','pointercancel','lostpointercapture'].forEach(ev=>el.addEventListener(ev,off));}
 hold('#bL','left');hold('#bR','right');hold('#bUp','gas');hold('#bDown','brake');
 $('#bItem').addEventListener('pointerdown',e=>{e.preventDefault();useItem(player);});
-$('#bChant').addEventListener('pointerdown',e=>{e.preventDefault();chantagem(player);});
+$('#bChant').addEventListener('pointerdown',e=>{e.preventDefault();if(player&&player.ch===CHARS[3])chantagem(player);});
+$('#bKiss').addEventListener('pointerdown',e=>{e.preventDefault();beijo();});
 $('#bHonk').addEventListener('pointerdown',e=>{e.preventDefault();honk();});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -551,7 +567,9 @@ function physics(r,dt,c){
   const idx=nearestIdx(r.x,r.z,r.idx);
   const lat=(r.x-P[idx].x)*NR[idx].x+(r.z-P[idx].z)*NR[idx].z;
   const off=Math.abs(lat)>W/2+1.4;
-  let maxS=MAXS*r.maxMul; if(r.panic>0)maxS*=0.85;
+  if(r.dizzy>0){r.dizzy-=dt;steer=Math.sin(raceTime*5+r.idx)*0.9;if(r.dizzy<=0&&r.st&&r.st.dizzy)r.st.dizzy.visible=false;}
+  if(r.love>0){r.love-=dt;if(r.love<=0&&r.st&&r.st.love)r.st.love.visible=false;}
+  let maxS=MAXS*r.maxMul; if(r.panic>0)maxS*=0.85; if(r.dizzy>0)maxS*=0.55; if(r.love>0)maxS*=0.35;
   if(r.boost>0){r.boost-=dt;maxS=52;r.speed=Math.max(r.speed,44);}
   else if(off) maxS*=0.45;
   if(throttle) r.speed+=ACC*dt;
@@ -577,6 +595,7 @@ function physics(r,dt,c){
   m.wheels.forEach(w=>w.rotation.x+=r.speed*dt/0.43);
   {const vx=r.x-camera.position.x,vz=r.z-camera.position.z;const away=Math.sin(r.a)*vx+Math.cos(r.a)*vz>0;m.back.visible=away;m.front.visible=!away;
    const rot=-r.steer*0.12*(away?1:-1);m.back.material.rotation=rot;m.front.material.rotation=rot;}
+  if(r.dizzy>0){m.body.rotation.y=Math.sin(raceTime*9)*0.5;} else if(r.spin<=0) m.body.rotation.y=0;
   if(r.panic>0){m.body.rotation.z+=Math.sin(raceTime*35)*0.18;m.body.position.y+=Math.abs(Math.sin(raceTime*18))*0.15;}
   m.flame.visible=r.boost>0; if(r.boost>0){const s=0.8+Math.random()*0.5;m.flame.scale.set(s,s,s);}
 }
@@ -640,7 +659,7 @@ function showResults(){
   $('#resTitle').textContent=player.rank===1?'1º LUGAR!':player.rank+'º lugar';
   $('#resMsg').textContent=(msgs[player.rank]||'')+(coins?` · 🪙 x ${coins} moedas da Duda`:'');
   $('#resList').innerHTML=list.map(r=>`<div class="resRow ${r.isP?'me':''}"><span class="p">${['🥇','🥈','🥉','4º'][r.rank-1]}</span><span class="av" style="background:${r.ch.kart}">${portraitSVG(r.ch)}</span>${r.ch.name.replace(/</g,'&lt;')}${r.isP?' (você)':''}<span class="t">${r.finished?fmt(r.finishTime):'ainda correndo…'}</span></div>`).join('');
-  $('#results').classList.remove('hidden'); $('#touch').classList.add('hidden'); $('#bChant').classList.add('hidden'); $('#itemIcon').textContent='';
+  $('#results').classList.remove('hidden'); $('#touch').classList.add('hidden'); $('#bChant').classList.add('hidden'); $('#bKiss').classList.add('hidden'); $('#itemIcon').textContent='';
 }
 
 /* ---------- Loop ---------- */
@@ -670,9 +689,13 @@ function frame(now){
       racers.forEach(r=>{if(r.isP){r.maxMul=1;return;}const diff=r.total-player.total;
         r.maxMul=r.ai.skill*(diff>60?r.ai.D.ahead:diff<-60?r.ai.D.behind:1)*(r.finished?0.8:1);});
       racers.forEach(r=>{const c=(r.isP&&state==='race')?playerControl():aiControl(r,dt);physics(r,dt,c);});
+      if(kissOK){kissCD-=dt;const kb=$('#bKiss');kb.disabled=kissCD>0;kb.textContent=kissCD>0?(isTouch?Math.ceil(kissCD):`📖 BEIJO (${Math.ceil(kissCD)})`):(isTouch?'📖':'📖 BEIJO');}
+      racers.forEach(r=>{if(r.love>0){r.heartT-=dt;if(r.heartT<=0){r.heartT=0.12;const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:heartT,transparent:true,depthWrite:false}));
+        sp.position.set(r.x+(Math.random()-0.5)*2.5,2+Math.random(),r.z+(Math.random()-0.5)*2.5);const sc=0.7+Math.random()*0.6;sp.scale.set(sc,sc,1);scene.add(sp);floaters.push({sp,ttl:1.4});}}});
+      for(let k=floaters.length-1;k>=0;k--){const f=floaters[k];f.ttl-=dt;f.sp.position.y+=dt*2.2;f.sp.material.opacity=Math.min(1,f.ttl);if(f.ttl<=0){scene.remove(f.sp);f.sp.material.dispose();floaters.splice(k,1);}}
       // chantagem
       if(chantCD>0)chantCD-=dt;
-      if(chantVictim){const b=$('#bChant');b.disabled=chantCD>0;b.textContent=chantCD>0?`💰 CHANTAGEM (${Math.ceil(chantCD)})`:'💰 CHANTAGEM';
+      if(chantVictim){const b=$('#bChant');b.disabled=chantCD>0;b.textContent=chantCD>0?(isTouch?Math.ceil(chantCD):`💰 CHANTAGEM (${Math.ceil(chantCD)})`):(isTouch?'💰':'💰 CHANTAGEM');
         const v=chantVictim; if(v.panic>0){v.panic-=dt;v.coinT-=dt;if(v.coinT<=0){spawnCoin(v);v.coinT=0.09;} if(v.panic<=0&&v.panicSprite)v.panicSprite.visible=false;}
         if(chantAI&&state==='race'){aiChantT-=dt;if(aiChantT<=0){chantagem(chantAI);aiChantT=18+Math.random()*12;}}}
       // batidas entre karts
