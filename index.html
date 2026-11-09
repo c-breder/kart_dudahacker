@@ -203,7 +203,7 @@ function saveNames(){try{localStorage.setItem('gp-amigas-modo',$('#diff').value)
 buildCards();
 $('#hint').textContent=isTouch
   ? '▲ acelera · ▼ freia/ré · ◀ ▶ vira · 🎁 lança o item pra frente · 📯 buzina'
-  : 'Setas ou WASD pra dirigir · ESPAÇO lança o item pra frente (segurando ↓ a banana vai pra trás) · H buzina';
+  : 'Setas ou WASD pra dirigir · ESPAÇO lança o item pra frente (segurando ↓ a banana vai pra trás) · H buzina · M chantagem';
 
 /* ---------- Áudio ---------- */
 let AC=null, engOsc=null, engGain=null, muted=false;
@@ -471,7 +471,7 @@ addEventListener('keydown',e=>{
   if(!e.repeat){
     if(e.code==='Space'||e.code==='ShiftLeft'||e.code==='KeyX') useItem(player);
     if(e.code==='KeyH') honk();
-    if(e.code==='KeyC'&&chantVictim&&!chantVictim.isP) chantagem(player);
+    if(e.code==='KeyM'&&chantVictim&&!chantVictim.isP) chantagem(player);
     if(e.code==='Enter'&&state==='menu') startRace();
   }
   keys[e.code]=true;
