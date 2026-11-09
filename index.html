@@ -116,7 +116,7 @@ if(isTouch) document.body.classList.add('touch');
 const CHARS=[
   {name:'Trinity', eye:'#6a3a20', hair:'#c4421c', shirt:'#1c1c22', kart:'#8a3ffc', tag:'cabelo ruivo · blusa preta'},
   {name:'Duda', eye:'#6a3a20',  hair:'#e0662b', shirt:'#1f3a8a', kart:'#f5b800', tag:'cabelo ruivo · blusa azul'},
-  {name:'Lorera', eye:'#2e9a4e',  hair:'#191314', shirt:'#e0457b', kart:'#19b38a', tag:'cabelo preto'}
+  {name:'Lorena', eye:'#2e9a4e',  hair:'#191314', shirt:'#e0457b', kart:'#19b38a', tag:'cabelo preto'}
 ];
 try{const s=JSON.parse(localStorage.getItem('gp-amigas-nomes-v2')||'null'); if(Array.isArray(s)) s.forEach((n,i)=>{if(n&&CHARS[i])CHARS[i].name=n;});}catch(e){}
 let chosen=0, rivals=[true,true,true];
