@@ -34,6 +34,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8fd3ff;font-family:'B
 .rivals{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px}
 .chip{font-family:inherit;font-size:17px;font-weight:800;border-radius:999px;padding:4px 16px;border:3px solid #fff;background:rgba(255,255,255,.45);color:#000;opacity:.6;cursor:pointer}
 .chip.on{background:#fff;color:#000;opacity:1}
+.chip:not(.on){text-decoration:line-through;opacity:.45}
 .chip .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:middle}
 #mute{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);pointer-events:auto;background:rgba(255,255,255,.4);border:3px solid #fff;border-radius:12px;font-size:20px;padding:2px 10px}
 body.touch #mute{bottom:auto;top:88px;left:12px;transform:none}
@@ -92,7 +93,7 @@ select{font-family:inherit;font-size:17px;font-weight:800;border-radius:10px;bor
   <h1 class="out">Kart Duda Hacker 🏁</h1>
   <div class="sub out">Escolha sua piloto e contra quem você quer correr!</div>
   <div id="cards"></div>
-  <div class="row out" style="text-align:center">Correr contra:<div class="rivals" id="rivals"></div></div>
+  <div class="row out" style="text-align:center">Correr contra:<div style="font-size:13px;font-weight:600">toque pra marcar ou desmarcar</div><div class="rivals" id="rivals"></div><div id="rivCount" style="font-size:15px;margin-top:6px"></div></div>
   <div class="row out">Modo:
     <select id="diff"><option value="facil">Fácil</option><option value="medio" selected>Médio</option><option value="dificil">Difícil</option><option value="psicose">Psicose 😈</option></select>
     &nbsp; Voltas:
@@ -130,8 +131,8 @@ const CHARS=[
   {name:'Joelly', eye:'#3a2216', hair:'#3b2618', tip:'#b07a3e', shirt:'#f0765a', inner:'#f3dfb0', skin:'#c98d64', skinD:'#a8704c', curly:true, kart:'#ff5aa0', tag:'cacheada'}
 ];
 try{const s=JSON.parse(localStorage.getItem('gp-amigas-nomes-v2')||'null'); if(Array.isArray(s)) s.forEach((n,i)=>{if(n&&CHARS[i])CHARS[i].name=n;});}catch(e){}
-let chosen=0, rivals=[true,true,true,true];
-try{chosen=+(localStorage.getItem('gp-amigas-escolha')||0)||0;const rv=JSON.parse(localStorage.getItem('gp-amigas-rivais')||'null');if(Array.isArray(rv))rivals=[0,1,2,3].map(i=>rv[i]!==false);}catch(e){}
+let chosen=0, rivals=[false,false,false,false];
+try{chosen=+(localStorage.getItem('gp-amigas-escolha')||0)||0;}catch(e){}
 if(!(chosen>=0&&chosen<CHARS.length))chosen=0;
 
 function shade(hex,f){let n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;
@@ -187,10 +188,15 @@ function buildCards(){
 function buildRivals(){
   const box=$('#rivals'); box.innerHTML='';
   const others=CHARS.map((_,i)=>i).filter(i=>i!==chosen);
-  if(!others.some(i=>rivals[i])) others.forEach(i=>rivals[i]=true);
+  rivals[chosen]=false;
+  const n=others.filter(i=>rivals[i]).length;
+  $('#rivCount').textContent=n?`Correndo contra ${n} ${n>1?'pilotas':'pilota'}`:'Escolha pelo menos uma rival';
+  $('#rivCount').style.color=n?'':'#ffe14d';
   others.forEach(i=>{const b=document.createElement('button');b.className='chip'+(rivals[i]?' on':'');
-    b.innerHTML=`<span class="dot" style="background:${CHARS[i].kart}"></span>`+CHARS[i].name.replace(/</g,'&lt;');
-    b.addEventListener('click',()=>{rivals[i]=!rivals[i]; if(!others.some(k=>rivals[k])) rivals[i]=true; saveNames(); buildRivals();});
+    b.innerHTML=(rivals[i]?'✓ ':'')+`<span class="dot" style="background:${CHARS[i].kart}"></span>`+CHARS[i].name.replace(/</g,'&lt;');
+    b.addEventListener('click',()=>{
+      rivals[i]=!rivals[i];
+      saveNames(); buildRivals();});
     box.appendChild(b);});
 }
 function saveNames(){try{localStorage.setItem('gp-amigas-modo',$('#diff').value);localStorage.setItem('gp-amigas-nomes-v2',JSON.stringify(CHARS.map(c=>c.name)));localStorage.setItem('gp-amigas-escolha',chosen);localStorage.setItem('gp-amigas-rivais',JSON.stringify(rivals));}catch(e){}}
@@ -426,6 +432,7 @@ function clearRace(){
   racers=[]; items=[]; boxes.forEach(b=>{b.active=true;b.mesh.visible=true;});
 }
 function startRace(){
+  if($('#diff').value!=='psicose'&&!CHARS.some((_,i)=>i!==chosen&&rivals[i])){$('#menu').classList.remove('hidden');$('#rivCount').animate([{transform:'scale(1)'},{transform:'scale(1.25)'},{transform:'scale(1)'}],{duration:400});return;}
   initAudio(); saveNames(); clearRace();
   LAPS=+$('#laps').value||3;
   const psy=$('#diff').value==='psicose', me=psy?1:chosen;
