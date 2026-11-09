@@ -405,7 +405,7 @@ function buildKart(ch){
 /* ---------- Estado da corrida ---------- */
 const MAXS=34, ACC=21, SPIN=1.1;
 let chantVictim=null, chantAI=null, chantCD=0, coins=0, aiChantT=20;
-const DUDA_LINES=['"NÃO!! Toma, pega o dinheiro!" 😱💸','"Eu pago! Eu pago! Não conta pra ninguém!" 😭💸','"Leva tudo, só não posta!" 😱🪙','"Pelo amor de Deus, toma aqui!" 😰💰'];
+const DUDA_LINES=['"NÃO CONTA NADA PRA SUA MÃE E PRO PAULINHO" 😱💸'];
 function chantagem(by){
   const v=chantVictim; if(!v||chantCD>0||state!=='race'||v.finished) return;
   chantCD=12; v.panic=4.5; v.coinT=0;
