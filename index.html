@@ -37,6 +37,11 @@ html,body{margin:0;height:100%;overflow:hidden;background:#8fd3ff;font-family:'B
 .chip .dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px;vertical-align:middle}
 #mute{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);pointer-events:auto;background:rgba(255,255,255,.4);border:3px solid #fff;border-radius:12px;font-size:20px;padding:2px 10px}
 body.touch #mute{bottom:auto;top:88px;left:12px;transform:none}
+#bChant{position:fixed;top:72px;left:12px;pointer-events:auto;font-family:inherit;font-weight:800;font-size:17px;color:#fff;background:#d6247a;border:3px solid #fff;border-radius:14px;padding:4px 14px;box-shadow:0 4px 0 #8c1350;touch-action:none}
+#bChant:disabled{background:#8a7a85;box-shadow:0 4px 0 #555}
+body.touch #bChant{top:132px}
+#coins{position:absolute;top:62px;left:12px;font-size:20px;font-weight:800}
+body:not(.touch) #coins{top:118px}
 .overlay{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px;background:linear-gradient(180deg,rgba(255,120,170,.55),rgba(90,80,220,.55));overflow:auto}
 .overlay>:first-child{margin-top:auto}.overlay>:last-child{margin-bottom:auto}
 h1{margin:0;font-size:clamp(40px,9vw,72px);line-height:1}
@@ -79,6 +84,8 @@ select{font-family:inherit;font-size:17px;font-weight:800;border-radius:10px;bor
     <div class="right"><button id="bHonk">📯</button><button id="bItem">🎁</button><button id="bDown">▼</button><button id="bUp">▲</button></div>
   </div>
   <button id="mute">🔊</button>
+  <button id="bChant" class="hidden">💰 CHANTAGEM</button>
+  <div id="coins" class="out hidden">🪙 x 0</div>
 </div>
 
 <div id="menu" class="overlay">
@@ -391,6 +398,23 @@ function buildKart(ch){
 
 /* ---------- Estado da corrida ---------- */
 const MAXS=34, ACC=21, SPIN=1.1;
+let chantVictim=null, chantAI=null, chantCD=0, coins=0, aiChantT=20;
+const DUDA_LINES=['"NÃO!! Toma, pega o dinheiro!" 😱💸','"Eu pago! Eu pago! Não conta pra ninguém!" 😭💸','"Leva tudo, só não posta!" 😱🪙','"Pelo amor de Deus, toma aqui!" 😰💰'];
+function chantagem(by){
+  const v=chantVictim; if(!v||chantCD>0||state!=='race'||v.finished) return;
+  chantCD=12; v.panic=4.5; v.coinT=0;
+  if(!v.panicSprite){v.panicSprite=nameSprite('😱 SOCORRO','#111');v.panicSprite.position.y=4.6;v.m.g.add(v.panicSprite);}
+  v.panicSprite.visible=true;
+  toast(v.isP?`${by.ch.name} te chantageou! Você: ${DUDA_LINES[Math.random()*DUDA_LINES.length|0]}`:`${v.ch.name}: ${DUDA_LINES[Math.random()*DUDA_LINES.length|0]}`);
+  [880,660,880,660].forEach((f,i)=>tone(f,0.12,'square',0.06,null,i*0.12));
+}
+const coinG=new THREE.CylinderGeometry(0.45,0.45,0.12,16), coinM=new THREE.MeshLambertMaterial({color:0xffcc22,emissive:0x664400});
+function spawnCoin(v){
+  if(items.filter(i=>i.type==='coin').length>60) return;
+  const m=new THREE.Mesh(coinG,coinM); m.rotation.x=Math.PI/2; scene.add(m);
+  const fx=Math.sin(v.a),fz=Math.cos(v.a),ang=Math.random()*Math.PI*2,sp=2+Math.random()*5;
+  items.push({type:'coin',mesh:m,x:v.x-fx*1.5,z:v.z-fz*1.5,y:1.6,vx:Math.cos(ang)*sp-fx*4,vz:Math.sin(ang)*sp-fz*4,vy:5+Math.random()*4,owner:v,immune:0.6,ttl:18});
+}
 const DIFF={facil:{skill:[0.86,0.83,0.8],ahead:0.8,behind:1.0,itemMin:3,itemRand:4,dodge:0.15},
   medio:{skill:[0.965,0.94,0.92],ahead:0.86,behind:1.07,itemMin:1,itemRand:3,dodge:0.6},
   dificil:{skill:[1.0,0.99,0.98],ahead:0.95,behind:1.12,itemMin:0.4,itemRand:1.5,dodge:0.95}};
@@ -417,6 +441,9 @@ function startRace(){
       ai:{lane:grid[k].lat,laneT:2,itemDelay:2,skill:D.skill[k]||D.skill[D.skill.length-1],D}};
     racers.push(r); if(isP) player=r;
   });
+  {const du=racers.find(r=>r.ch===CHARS[1]), jo=racers.find(r=>r.ch===CHARS[3]);
+   chantVictim=(du&&jo)?du:null; chantAI=(du&&jo&&du.isP)?jo:null; chantCD=0; coins=0; aiChantT=12+Math.random()*10;
+   $('#bChant').classList.toggle('hidden',!(chantVictim&&!chantVictim.isP)); $('#coins').classList.add('hidden');}
   raceTime=0; countT=3.999; lastCount=4; state='count';
   $('#menu').classList.add('hidden'); $('#results').classList.add('hidden'); $('#hud').classList.remove('hidden');
   $('#touch').classList.toggle('hidden',!isTouch);
@@ -437,6 +464,7 @@ addEventListener('keydown',e=>{
   if(!e.repeat){
     if(e.code==='Space'||e.code==='ShiftLeft'||e.code==='KeyX') useItem(player);
     if(e.code==='KeyH') honk();
+    if(e.code==='KeyC'&&chantVictim&&!chantVictim.isP) chantagem(player);
     if(e.code==='Enter'&&state==='menu') startRace();
   }
   keys[e.code]=true;
@@ -448,6 +476,7 @@ function hold(id,k){const el=$(id);
   el.addEventListener('pointerdown',on);['pointerup','pointercancel','lostpointercapture'].forEach(ev=>el.addEventListener(ev,off));}
 hold('#bL','left');hold('#bR','right');hold('#bUp','gas');hold('#bDown','brake');
 $('#bItem').addEventListener('pointerdown',e=>{e.preventDefault();useItem(player);});
+$('#bChant').addEventListener('pointerdown',e=>{e.preventDefault();chantagem(player);});
 $('#bHonk').addEventListener('pointerdown',e=>{e.preventDefault();honk();});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -515,7 +544,7 @@ function physics(r,dt,c){
   const idx=nearestIdx(r.x,r.z,r.idx);
   const lat=(r.x-P[idx].x)*NR[idx].x+(r.z-P[idx].z)*NR[idx].z;
   const off=Math.abs(lat)>W/2+1.4;
-  let maxS=MAXS*r.maxMul;
+  let maxS=MAXS*r.maxMul; if(r.panic>0)maxS*=0.85;
   if(r.boost>0){r.boost-=dt;maxS=52;r.speed=Math.max(r.speed,44);}
   else if(off) maxS*=0.45;
   if(throttle) r.speed+=ACC*dt;
@@ -541,6 +570,7 @@ function physics(r,dt,c){
   m.wheels.forEach(w=>w.rotation.x+=r.speed*dt/0.43);
   {const vx=r.x-camera.position.x,vz=r.z-camera.position.z;const away=Math.sin(r.a)*vx+Math.cos(r.a)*vz>0;m.back.visible=away;m.front.visible=!away;
    const rot=-r.steer*0.12*(away?1:-1);m.back.material.rotation=rot;m.front.material.rotation=rot;}
+  if(r.panic>0){m.body.rotation.z+=Math.sin(raceTime*35)*0.18;m.body.position.y+=Math.abs(Math.sin(raceTime*18))*0.15;}
   m.flame.visible=r.boost>0; if(r.boost>0){const s=0.8+Math.random()*0.5;m.flame.scale.set(s,s,s);}
 }
 function aiControl(r,dt){
@@ -601,9 +631,9 @@ function showResults(){
   const n=racers.length;
   const msgs={};for(let k=1;k<=n;k++)msgs[k]=k===1?'RAINHA DA PISTA 👑':k===n?'Pelo menos o cabelo tava impecável 💅':'Quase! Com certeza foi culpa do tubarãozinho 🦈';
   $('#resTitle').textContent=player.rank===1?'1º LUGAR!':player.rank+'º lugar';
-  $('#resMsg').textContent=msgs[player.rank]||'';
+  $('#resMsg').textContent=(msgs[player.rank]||'')+(coins?` · 🪙 x ${coins} moedas da Duda`:'');
   $('#resList').innerHTML=list.map(r=>`<div class="resRow ${r.isP?'me':''}"><span class="p">${['🥇','🥈','🥉','4º'][r.rank-1]}</span><span class="av" style="background:${r.ch.kart}">${portraitSVG(r.ch)}</span>${r.ch.name.replace(/</g,'&lt;')}${r.isP?' (você)':''}<span class="t">${r.finished?fmt(r.finishTime):'ainda correndo…'}</span></div>`).join('');
-  $('#results').classList.remove('hidden'); $('#touch').classList.add('hidden'); $('#itemIcon').textContent='';
+  $('#results').classList.remove('hidden'); $('#touch').classList.add('hidden'); $('#bChant').classList.add('hidden'); $('#itemIcon').textContent='';
 }
 
 /* ---------- Loop ---------- */
@@ -633,6 +663,11 @@ function frame(now){
       racers.forEach(r=>{if(r.isP){r.maxMul=1;return;}const diff=r.total-player.total;
         r.maxMul=r.ai.skill*(diff>60?r.ai.D.ahead:diff<-60?r.ai.D.behind:1)*(r.finished?0.8:1);});
       racers.forEach(r=>{const c=(r.isP&&state==='race')?playerControl():aiControl(r,dt);physics(r,dt,c);});
+      // chantagem
+      if(chantCD>0)chantCD-=dt;
+      if(chantVictim){const b=$('#bChant');b.disabled=chantCD>0;b.textContent=chantCD>0?`💰 CHANTAGEM (${Math.ceil(chantCD)})`:'💰 CHANTAGEM';
+        const v=chantVictim; if(v.panic>0){v.panic-=dt;v.coinT-=dt;if(v.coinT<=0){spawnCoin(v);v.coinT=0.09;} if(v.panic<=0&&v.panicSprite)v.panicSprite.visible=false;}
+        if(chantAI&&state==='race'){aiChantT-=dt;if(aiChantT<=0){chantagem(chantAI);aiChantT=18+Math.random()*12;}}}
       // batidas entre karts
       if(bumpCD>0)bumpCD-=dt;
       for(let i=0;i<racers.length;i++)for(let j=i+1;j<racers.length;j++){const a=racers[i],b=racers[j];
@@ -648,6 +683,12 @@ function frame(now){
           if(r.rolling<=0){r.item=r.pending;r.pending=null;if(r.isP){$('#itemIcon').textContent=ICON[r.item];SFX.item();}}}});
       // itens no chão / voando
       for(let k=items.length-1;k>=0;k--){const it=items[k]; it.ttl-=dt; it.immune-=dt; let dead=it.ttl<=0;
+        if(it.type==='coin'){
+          if(it.y>0.6||it.vy>0){it.vy-=22*dt;it.x+=it.vx*dt;it.z+=it.vz*dt;it.y+=it.vy*dt;if(it.y<=0.6){it.y=0.6;it.vy=0;it.vx=0;it.vz=0;}}
+          it.mesh.position.set(it.x,it.y+(it.vy===0?Math.sin(now/300+k)*0.12:0),it.z); it.mesh.rotation.z+=dt*5;
+          if(!dead&&it.y<1.5) for(const r of racers){ if(r===it.owner) continue; const dx=r.x-it.x,dz=r.z-it.z;
+            if(dx*dx+dz*dz<4.5){dead=true;r.boost=Math.max(r.boost,0.3);if(r.isP){coins++;$('#coins').textContent='🪙 x '+coins;$('#coins').classList.remove('hidden');tone(1320,0.08,'square',0.05);tone(1760,0.12,'square',0.05,null,0.07);}break;}}
+          if(dead){scene.remove(it.mesh);items.splice(k,1);} continue;}
         if(it.type==='tubarao'&&!dead){
           let tx,tz; if(it.target&&!it.target.finished){tx=it.target.x;tz=it.target.z;}else{it.idx=nearestIdx(it.x,it.z,it.idx);const la=(it.idx+10)%N;tx=P[la].x;tz=P[la].z;}
           const d=wrapAng(Math.atan2(tx-it.x,tz-it.z)-it.a); it.a+=clamp(d,-4*dt,4*dt);
@@ -659,7 +700,7 @@ function frame(now){
           const dx=r.x-it.x,dz=r.z-it.z; if(dx*dx+dz*dz<(it.type==='tubarao'?4:2.6)){hit(r,it.type,it.owner);dead=true;break;}}
         if(dead){scene.remove(it.mesh);items.splice(k,1);}
       }
-      if(items.length>24){const old=items.findIndex(i=>i.type==='banana');if(old>=0){scene.remove(items[old].mesh);items.splice(old,1);}}
+      if(items.filter(i=>i.type!=='coin').length>24){const old=items.findIndex(i=>i.type==='banana');if(old>=0){scene.remove(items[old].mesh);items.splice(old,1);}}
     }
     // ranking
     racers.slice().sort((a,b)=>(b.finished-a.finished)||(a.finished?a.finishTime-b.finishTime:b.total-a.total)).forEach((r,i)=>{if(!(r.finished&&r.rankLocked))r.rank=i+1;if(r.finished)r.rankLocked=true;});
